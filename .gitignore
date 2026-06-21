@@ -55,3 +55,12 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Visual Studio
+.vs/
+
+# GitHub Copilot upgrade scenarios (auto-generated)
+.github/upgrades/
+
+# Azure Functions local settings
+local.settings.json
