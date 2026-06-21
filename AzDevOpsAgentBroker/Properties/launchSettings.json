@@ -3,7 +3,19 @@
     "AzDevOpsAgentBroker": {
       "commandName": "Project",
       "commandLineArgs": "--port 7226",
-      "launchBrowser": false
+      "launchBrowser": false,
+      "environmentVariables": {
+        "AZURE_FUNCTIONS_ENVIRONMENT": "Development"
+      }
+    },
+    "AzDevOpsAgentBroker (func CLI)": {
+      "commandName": "Executable",
+      "executablePath": "func",
+      "commandLineArgs": "start --port 7226",
+      "workingDirectory": "$(ProjectDir)bin\\$(Configuration)\\net10.0",
+      "environmentVariables": {
+        "AZURE_FUNCTIONS_ENVIRONMENT": "Development"
+      }
     }
   }
 }

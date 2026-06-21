@@ -1,30 +1,30 @@
 using System;
 using System.IO;
+using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using AzDevOpsAgentBroker.Services;
 
 namespace AzDevOpsAgentBroker
 {
     public static class GetPullRequestDiff
     {
-        [FunctionName("GetPullRequestDiff")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("GetPullRequestDiff")]
+        public static async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
         {
+            ILogger log = context.GetLogger("GetPullRequestDiff");
             log.LogInformation("GetPullRequestDiff triggered.");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var input = JsonConvert.DeserializeObject<PullRequestInput>(requestBody);
+            var input = JsonSerializer.Deserialize<PullRequestInput>(requestBody);
 
             if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
-                return new BadRequestObjectResult("RepoId and PrId are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
@@ -33,24 +33,25 @@ namespace AzDevOpsAgentBroker
             var broker = new DevOpsBroker(orgUrl);
             string diff = await broker.GetPullRequestDiff(project, input.RepoId, input.PrId, vaultUri);
 
-            return new OkObjectResult(diff);
+            return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, diff);
         }
     }
 
     public static class GetPullRequestDetails
     {
-        [FunctionName("GetPullRequestDetails")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("GetPullRequestDetails")]
+        public static async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
         {
+            ILogger log = context.GetLogger("GetPullRequestDetails");
             log.LogInformation("GetPullRequestDetails triggered.");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var input = JsonConvert.DeserializeObject<PullRequestInput>(requestBody);
+            var input = JsonSerializer.Deserialize<PullRequestInput>(requestBody);
 
             if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
-                return new BadRequestObjectResult("RepoId and PrId are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
@@ -59,24 +60,25 @@ namespace AzDevOpsAgentBroker
             var broker = new DevOpsBroker(orgUrl);
             string details = await broker.GetPullRequestDetails(project, input.RepoId, input.PrId, vaultUri);
 
-            return new OkObjectResult(details);
+            return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, details);
         }
     }
 
     public static class GetFileContent
     {
-        [FunctionName("GetFileContent")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("GetFileContent")]
+        public static async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
         {
+            ILogger log = context.GetLogger("GetFileContent");
             log.LogInformation("GetFileContent triggered.");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var input = JsonConvert.DeserializeObject<FileContentInput>(requestBody);
+            var input = JsonSerializer.Deserialize<FileContentInput>(requestBody);
 
             if (string.IsNullOrEmpty(input?.RepoId) || string.IsNullOrEmpty(input?.FilePath) || string.IsNullOrEmpty(input?.CommitId))
-                return new BadRequestObjectResult("RepoId, FilePath, and CommitId are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, FilePath, and CommitId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
@@ -85,24 +87,25 @@ namespace AzDevOpsAgentBroker
             var broker = new DevOpsBroker(orgUrl);
             string content = await broker.GetFileContent(project, input.RepoId, input.FilePath, input.CommitId, vaultUri);
 
-            return new OkObjectResult(content);
+            return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, content);
         }
     }
 
     public static class PostPRComment
     {
-        [FunctionName("PostPRComment")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
-            ILogger log)
+        [Function("PostPRComment")]
+        public static async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
         {
+            ILogger log = context.GetLogger("PostPRComment");
             log.LogInformation("PostPRComment triggered.");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var input = JsonConvert.DeserializeObject<PostCommentInput>(requestBody);
+            var input = JsonSerializer.Deserialize<PostCommentInput>(requestBody);
 
             if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0 || string.IsNullOrEmpty(input?.Comment))
-                return new BadRequestObjectResult("RepoId, PrId, and Comment are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, PrId, and Comment are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
@@ -111,32 +114,49 @@ namespace AzDevOpsAgentBroker
             var broker = new DevOpsBroker(orgUrl);
             await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment, vaultUri);
 
-            return new OkObjectResult(new { success = true, message = "Comment posted successfully." });
+            return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new { success = true, message = "Comment posted successfully." });
+        }
+    }
+
+    internal static class FunctionResponses
+    {
+        internal static async Task<HttpResponseData> CreateTextResponse(HttpRequestData req, HttpStatusCode statusCode, string content)
+        {
+            var response = req.CreateResponse(statusCode);
+            await response.WriteStringAsync(content ?? string.Empty);
+            return response;
+        }
+
+        internal static async Task<HttpResponseData> CreateJsonResponse(HttpRequestData req, HttpStatusCode statusCode, object payload)
+        {
+            var response = req.CreateResponse(statusCode);
+            await response.WriteAsJsonAsync(payload);
+            return response;
         }
     }
 
     // Input models
     public class PullRequestInput
     {
-        public string Project { get; set; }
-        public string RepoId { get; set; }
+        public string? Project { get; set; }
+        public string? RepoId { get; set; }
         public int PrId { get; set; }
     }
 
     public class FileContentInput
     {
-        public string Project { get; set; }
-        public string RepoId { get; set; }
-        public string FilePath { get; set; }
-        public string CommitId { get; set; }
+        public string? Project { get; set; }
+        public string? RepoId { get; set; }
+        public string? FilePath { get; set; }
+        public string? CommitId { get; set; }
     }
 
     public class PostCommentInput
     {
-        public string Project { get; set; }
-        public string RepoId { get; set; }
+        public string? Project { get; set; }
+        public string? RepoId { get; set; }
         public int PrId { get; set; }
-        public string Comment { get; set; }
+        public string? Comment { get; set; }
     }
 }
 
