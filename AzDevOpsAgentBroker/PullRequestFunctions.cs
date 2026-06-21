@@ -27,11 +27,14 @@ namespace AzDevOpsAgentBroker
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
-            string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
+            string pat = Environment.GetEnvironmentVariable("AzDoPat");
             string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
 
-            var broker = new DevOpsBroker(orgUrl);
-            string diff = await broker.GetPullRequestDiff(project, input.RepoId, input.PrId, vaultUri);
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+
+            var broker = new DevOpsBroker(orgUrl, pat);
+            string diff = await broker.GetPullRequestDiff(project, input.RepoId, input.PrId);
 
             return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, diff);
         }
@@ -54,11 +57,14 @@ namespace AzDevOpsAgentBroker
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
-            string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
+            string pat = Environment.GetEnvironmentVariable("AzDoPat");
             string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
 
-            var broker = new DevOpsBroker(orgUrl);
-            string details = await broker.GetPullRequestDetails(project, input.RepoId, input.PrId, vaultUri);
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+
+            var broker = new DevOpsBroker(orgUrl, pat);
+            string details = await broker.GetPullRequestDetails(project, input.RepoId, input.PrId);
 
             return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, details);
         }
@@ -81,11 +87,14 @@ namespace AzDevOpsAgentBroker
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, FilePath, and CommitId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
-            string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
+            string pat = Environment.GetEnvironmentVariable("AzDoPat");
             string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
 
-            var broker = new DevOpsBroker(orgUrl);
-            string content = await broker.GetFileContent(project, input.RepoId, input.FilePath, input.CommitId, vaultUri);
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+
+            var broker = new DevOpsBroker(orgUrl, pat);
+            string content = await broker.GetFileContent(project, input.RepoId, input.FilePath, input.CommitId);
 
             return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.OK, content);
         }
@@ -108,11 +117,14 @@ namespace AzDevOpsAgentBroker
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, PrId, and Comment are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
-            string vaultUri = Environment.GetEnvironmentVariable("KeyVaultUri");
+            string pat = Environment.GetEnvironmentVariable("AzDoPat");
             string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
 
-            var broker = new DevOpsBroker(orgUrl);
-            await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment, vaultUri);
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+
+            var broker = new DevOpsBroker(orgUrl, pat);
+            await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment);
 
             return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new { success = true, message = "Comment posted successfully." });
         }

@@ -1,5 +1,3 @@
-using Azure.Identity;
-using Azure.Security.KeyVault.Secrets;
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -12,28 +10,22 @@ namespace AzDevOpsAgentBroker.Services
     {
         private readonly HttpClient _httpClient;
         private readonly string _orgUrl;
+        private readonly string _pat;
 
-        public DevOpsBroker(string orgUrl)
+        public DevOpsBroker(string orgUrl, string pat)
         {
             _httpClient = new HttpClient();
             _orgUrl = orgUrl.TrimEnd('/');
+            _pat = pat;
         }
 
-        private async Task<string> GetPatFromVault(string vaultUri)
+        public async Task<string> GetPullRequestDiff(string project, string repoId, int prId)
         {
-            var client = new SecretClient(new Uri(vaultUri), new DefaultAzureCredential());
-            KeyVaultSecret secret = await client.GetSecretAsync("AzDoPat");
-            return secret.Value;
-        }
-
-        public async Task<string> GetPullRequestDiff(string project, string repoId, int prId, string vaultUri)
-        {
-            string pat = await GetPatFromVault(vaultUri);
             var url = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/pullRequests/{prId}/iterations?api-version=7.1";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}")));
+                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_pat}")));
 
             var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
@@ -47,35 +39,33 @@ namespace AzDevOpsAgentBroker.Services
             var changesUrl = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/pullRequests/{prId}/iterations/{iterationCount}/changes?api-version=7.1";
             var changesRequest = new HttpRequestMessage(HttpMethod.Get, changesUrl);
             changesRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}")));
+                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_pat}")));
 
             var changesResponse = await _httpClient.SendAsync(changesRequest);
             changesResponse.EnsureSuccessStatusCode();
             return await changesResponse.Content.ReadAsStringAsync();
         }
 
-        public async Task<string> GetPullRequestDetails(string project, string repoId, int prId, string vaultUri)
+        public async Task<string> GetPullRequestDetails(string project, string repoId, int prId)
         {
-            string pat = await GetPatFromVault(vaultUri);
             var url = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/pullRequests/{prId}?api-version=7.1";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}")));
+                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_pat}")));
 
             var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync();
         }
 
-        public async Task<string> GetFileContent(string project, string repoId, string path, string commitId, string vaultUri)
+        public async Task<string> GetFileContent(string project, string repoId, string path, string commitId)
         {
-            string pat = await GetPatFromVault(vaultUri);
             var url = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/items?path={Uri.EscapeDataString(path)}&versionDescriptor.version={commitId}&versionDescriptor.versionType=commit&api-version=7.1";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}")));
+                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_pat}")));
 
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
@@ -84,9 +74,8 @@ namespace AzDevOpsAgentBroker.Services
             return await response.Content.ReadAsStringAsync();
         }
 
-        public async Task PostPRComment(string project, string repoId, int prId, string content, string vaultUri)
+        public async Task PostPRComment(string project, string repoId, int prId, string content)
         {
-            string pat = await GetPatFromVault(vaultUri);
             var url = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/pullRequests/{prId}/threads?api-version=7.1";
 
             var payload = new
@@ -97,7 +86,7 @@ namespace AzDevOpsAgentBroker.Services
 
             var request = new HttpRequestMessage(HttpMethod.Post, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
-                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{pat}")));
+                Convert.ToBase64String(Encoding.ASCII.GetBytes($":{_pat}")));
             request.Content = new StringContent(
                 System.Text.Json.JsonSerializer.Serialize(payload),
                 Encoding.UTF8,
