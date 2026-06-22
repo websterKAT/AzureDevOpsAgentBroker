@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -23,15 +24,15 @@ namespace AzDevOpsAgentBroker
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var input = JsonSerializer.Deserialize<PullRequestInput>(requestBody);
 
-            if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
+            if (string.IsNullOrWhiteSpace(input?.Project) || string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Project, RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string pat = Environment.GetEnvironmentVariable("AzDoPat");
-            string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
+            string project = input.Project;
 
-            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl or AzDoPat configuration.");
 
             var broker = new DevOpsBroker(orgUrl, pat);
             string diff = await broker.GetPullRequestDiff(project, input.RepoId, input.PrId);
@@ -53,15 +54,15 @@ namespace AzDevOpsAgentBroker
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var input = JsonSerializer.Deserialize<PullRequestInput>(requestBody);
 
-            if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId and PrId are required.");
+            if (string.IsNullOrWhiteSpace(input?.Project) || string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0)
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Project, RepoId and PrId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string pat = Environment.GetEnvironmentVariable("AzDoPat");
-            string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
+            string project = input.Project;
 
-            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl or AzDoPat configuration.");
 
             var broker = new DevOpsBroker(orgUrl, pat);
             string details = await broker.GetPullRequestDetails(project, input.RepoId, input.PrId);
@@ -83,15 +84,15 @@ namespace AzDevOpsAgentBroker
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var input = JsonSerializer.Deserialize<FileContentInput>(requestBody);
 
-            if (string.IsNullOrEmpty(input?.RepoId) || string.IsNullOrEmpty(input?.FilePath) || string.IsNullOrEmpty(input?.CommitId))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, FilePath, and CommitId are required.");
+            if (string.IsNullOrWhiteSpace(input?.Project) || string.IsNullOrEmpty(input?.RepoId) || string.IsNullOrEmpty(input?.FilePath) || string.IsNullOrEmpty(input?.CommitId))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Project, RepoId, FilePath, and CommitId are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string pat = Environment.GetEnvironmentVariable("AzDoPat");
-            string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
+            string project = input.Project;
 
-            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl or AzDoPat configuration.");
 
             var broker = new DevOpsBroker(orgUrl, pat);
             string content = await broker.GetFileContent(project, input.RepoId, input.FilePath, input.CommitId);
@@ -113,15 +114,15 @@ namespace AzDevOpsAgentBroker
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var input = JsonSerializer.Deserialize<PostCommentInput>(requestBody);
 
-            if (string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0 || string.IsNullOrEmpty(input?.Comment))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "RepoId, PrId, and Comment are required.");
+            if (string.IsNullOrWhiteSpace(input?.Project) || string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0 || string.IsNullOrEmpty(input?.Comment))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Project, RepoId, PrId, and Comment are required.");
 
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string pat = Environment.GetEnvironmentVariable("AzDoPat");
-            string project = input.Project ?? Environment.GetEnvironmentVariable("AzDoProject");
+            string project = input.Project;
 
-            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(pat))
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl, AzDoProject, or AzDoPat configuration.");
+            if (string.IsNullOrWhiteSpace(orgUrl) || string.IsNullOrWhiteSpace(pat))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl or AzDoPat configuration.");
 
             var broker = new DevOpsBroker(orgUrl, pat);
             await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment);
@@ -150,24 +151,43 @@ namespace AzDevOpsAgentBroker
     // Input models
     public class PullRequestInput
     {
+        [JsonPropertyName("project")]
         public string? Project { get; set; }
+
+        [JsonPropertyName("repoId")]
         public string? RepoId { get; set; }
+
+        [JsonPropertyName("prId")]
         public int PrId { get; set; }
     }
 
     public class FileContentInput
     {
+        [JsonPropertyName("project")]
         public string? Project { get; set; }
+
+        [JsonPropertyName("repoId")]
         public string? RepoId { get; set; }
+
+        [JsonPropertyName("filePath")]
         public string? FilePath { get; set; }
+
+        [JsonPropertyName("commitId")]
         public string? CommitId { get; set; }
     }
 
     public class PostCommentInput
     {
+        [JsonPropertyName("project")]
         public string? Project { get; set; }
+
+        [JsonPropertyName("repoId")]
         public string? RepoId { get; set; }
+
+        [JsonPropertyName("prId")]
         public int PrId { get; set; }
+
+        [JsonPropertyName("comment")]
         public string? Comment { get; set; }
     }
 }
