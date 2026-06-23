@@ -131,6 +131,36 @@ namespace AzDevOpsAgentBroker
         }
     }
 
+    public static class PRWebhookReceiver
+    {
+        [Function("PRWebhookReceiver")]
+        public static async Task<HttpResponseData> Run(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
+        {
+            ILogger log = context.GetLogger("PRWebhookReceiver");
+            log.LogInformation("PRWebhookReceiver triggered.");
+
+            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+            var payload = JsonSerializer.Deserialize<PullRequestWebhookPayload>(requestBody);
+
+            string? repoId = payload?.Resource?.Repository?.Id;
+            int prId = payload?.Resource?.PullRequestId ?? 0;
+
+            if (string.IsNullOrWhiteSpace(repoId) || prId <= 0)
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Invalid webhook payload. Repository id and pullRequestId are required.");
+
+            log.LogInformation("Webhook received for PR #{PrId} in repo {RepoId}. Initiating Azure AI Foundry Agent thread.", prId, repoId);
+
+            return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
+            {
+                message = "Orchestration thread started.",
+                repoId,
+                prId
+            });
+        }
+    }
+
     internal static class FunctionResponses
     {
         internal static async Task<HttpResponseData> CreateTextResponse(HttpRequestData req, HttpStatusCode statusCode, string content)
@@ -189,6 +219,27 @@ namespace AzDevOpsAgentBroker
 
         [JsonPropertyName("comment")]
         public string? Comment { get; set; }
+    }
+
+    public class PullRequestWebhookPayload
+    {
+        [JsonPropertyName("resource")]
+        public PullRequestWebhookResource? Resource { get; set; }
+    }
+
+    public class PullRequestWebhookResource
+    {
+        [JsonPropertyName("repository")]
+        public PullRequestWebhookRepository? Repository { get; set; }
+
+        [JsonPropertyName("pullRequestId")]
+        public int PullRequestId { get; set; }
+    }
+
+    public class PullRequestWebhookRepository
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
     }
 }
 
