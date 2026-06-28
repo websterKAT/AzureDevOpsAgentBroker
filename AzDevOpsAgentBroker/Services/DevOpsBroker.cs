@@ -74,15 +74,34 @@ namespace AzDevOpsAgentBroker.Services
             return await response.Content.ReadAsStringAsync();
         }
 
-        public async Task PostPRComment(string project, string repoId, int prId, string content)
+        public async Task PostPRComment(string project, string repoId, int prId, string content, string? path = null, int? line = null)
         {
             var url = $"{_orgUrl}/{project}/_apis/git/repositories/{repoId}/pullRequests/{prId}/threads?api-version=7.1";
 
-            var payload = new
+            object payload;
+
+            if (!string.IsNullOrWhiteSpace(path) && line.HasValue)
             {
-                comments = new[] { new { content, commentType = 1 } },
-                status = 1
-            };
+                payload = new
+                {
+                    comments = new[] { new { content, commentType = 1 } },
+                    status = 1,
+                    threadContext = new
+                    {
+                        filePath = path,
+                        rightFileStart = new { line = line.Value, offset = 1 },
+                        rightFileEnd = new { line = line.Value, offset = 1 }
+                    }
+                };
+            }
+            else
+            {
+                payload = new
+                {
+                    comments = new[] { new { content, commentType = 1 } },
+                    status = 1
+                };
+            }
 
             var request = new HttpRequestMessage(HttpMethod.Post, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Basic",

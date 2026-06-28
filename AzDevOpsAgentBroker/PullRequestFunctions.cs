@@ -117,6 +117,13 @@ namespace AzDevOpsAgentBroker
             if (string.IsNullOrWhiteSpace(input?.Project) || string.IsNullOrEmpty(input?.RepoId) || input.PrId <= 0 || string.IsNullOrEmpty(input?.Comment))
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Project, RepoId, PrId, and Comment are required.");
 
+            if ((!string.IsNullOrWhiteSpace(input.Path) && !input.Line.HasValue) ||
+                (string.IsNullOrWhiteSpace(input.Path) && input.Line.HasValue) ||
+                (input.Line.HasValue && input.Line.Value <= 0))
+            {
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "For inline comments, both Path and Line (> 0) are required.");
+            }
+
             string orgUrl = Environment.GetEnvironmentVariable("AzDoOrgUrl");
             string pat = Environment.GetEnvironmentVariable("AzDoPat");
             string project = input.Project;
@@ -125,7 +132,7 @@ namespace AzDevOpsAgentBroker
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing AzDoOrgUrl or AzDoPat configuration.");
 
             var broker = new DevOpsBroker(orgUrl, pat);
-            await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment);
+            await broker.PostPRComment(project, input.RepoId, input.PrId, input.Comment, input.Path, input.Line);
 
             return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new { success = true, message = "Comment posted successfully." });
         }
@@ -219,6 +226,12 @@ namespace AzDevOpsAgentBroker
 
         [JsonPropertyName("comment")]
         public string? Comment { get; set; }
+
+        [JsonPropertyName("path")]
+        public string? Path { get; set; }
+
+        [JsonPropertyName("line")]
+        public int? Line { get; set; }
     }
 
     public class PullRequestWebhookPayload
