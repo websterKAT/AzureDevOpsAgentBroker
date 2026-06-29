@@ -1,0 +1,135 @@
+openapi: 3.0.1
+info:
+  title: Azure DevOps AI Reviewer Code Tools
+  description: Atomic backend APIs that allow an AI Agent to inspect pull request diffs, fetch repository file streams, and publish markdown conversations back to Azure DevOps.
+  version: 1.0.0
+servers:
+  - url: https://azdevopsagentbroker.azurewebsites.net/api
+    description: Production Azure Functions Host
+paths:
+  /GetPullRequestDetails:
+    post:
+      operationId: get_pr_details
+      summary: Fetches metadata about an active Pull Request
+      description: Returns descriptive information regarding target branches, status, and authors for a specific Azure DevOps PR.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Azure DevOps project name or ID
+                repoId:
+                  type: string
+                  description: The target GUID or name of the repository
+                prId:
+                  type: integer
+                  description: The specific numerical identity of the PR
+              required:
+                - project
+                - repoId
+                - prId
+      responses:
+        '200':
+          description: Successfully retrieved pull request properties string.
+  /GetPullRequestDiff:
+    post:
+      operationId: get_pr_diff
+      summary: Extracts the git diff data changes for the pull request
+      description: Retrieves code delta changes, allowing the agent to audit line additions, updates, or removals across files.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Azure DevOps project name or ID
+                repoId:
+                  type: string
+                  description: The target repository identity
+                prId:
+                  type: integer
+                  description: The pull request tracking ID
+              required:
+                - project
+                - repoId
+                - prId
+      responses:
+        '200':
+          description: Successfully returned Git diff content text.
+  /GetFileContent:
+    post:
+      operationId: get_file_content
+      summary: Retrieves the full source code stream of a specific repository file path
+      description: Used when the model needs file-level context beyond the lines provided inside the raw diff stream (e.g., assessing complete Angular component classes or extensive legacy .NET class configuration files).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Azure DevOps project name or ID
+                repoId:
+                  type: string
+                  description: The target repository identity
+                filePath:
+                  type: string
+                  description: The exact relative path inside the repository (e.g., /src/app/app.component.ts)
+                commitId:
+                  type: string
+                  description: Commit SHA used to fetch file content snapshot
+              required:
+                - project
+                - repoId
+                - filePath
+                - commitId
+      responses:
+        '200':
+          description: Raw string contents of the requested source code file.
+  /PostPRComment:
+    post:
+      operationId: post_pr_comment
+      summary: Publishes a markdown discussion thread review back to the Pull Request
+      description: Allows the agent to leaves its automated review comments on specific lines or provide a macro summary evaluation text.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project:
+                  type: string
+                  description: Azure DevOps project name or ID
+                repoId:
+                  type: string
+                  description: The unique repository id string
+                prId:
+                  type: integer
+                  description: The unique PR identifier
+                comment:
+                  type: string
+                  description: The comprehensive markdown critique or suggestion to leave on the PR thread
+                path:
+                  type: string
+                  description: Relative target file file path. Leave out if submitting a high-level general summary review.
+                line:
+                  type: integer
+                  description: Target line location. Leave out if submitting a high-level general summary review.
+              required:
+                - project
+                - repoId
+                - prId
+                - comment
+      responses:
+        '200':
+          description: Review comment thread posted successfully.
