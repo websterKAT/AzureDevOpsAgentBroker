@@ -4,6 +4,8 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Azure.AI.Agents.Persistent;
+using Azure.Identity;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -140,31 +142,84 @@ namespace AzDevOpsAgentBroker
 
     public static class PRWebhookReceiver
     {
+        private static readonly string? ProjectEndpoint = Environment.GetEnvironmentVariable("FoundryProjectEndpoint");
+        private static readonly string? AgentBlueprintId = Environment.GetEnvironmentVariable("FoundryAgentId");
+
         [Function("PRWebhookReceiver")]
         public static async Task<HttpResponseData> Run(
             [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
             FunctionContext context)
         {
             ILogger log = context.GetLogger("PRWebhookReceiver");
-            log.LogInformation("PRWebhookReceiver triggered.");
+            log.LogInformation("Webhook received from Azure DevOps Pull Request trigger event.");
+
+            if (string.IsNullOrWhiteSpace(ProjectEndpoint) || string.IsNullOrWhiteSpace(AgentBlueprintId))
+            {
+                log.LogError("Missing Foundry configuration. Both FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_AGENT_ID are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing FOUNDRY_PROJECT_ENDPOINT or FOUNDRY_AGENT_ID configuration.");
+            }
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var payload = JsonSerializer.Deserialize<PullRequestWebhookPayload>(requestBody);
 
             string? repoId = payload?.Resource?.Repository?.Id;
             int prId = payload?.Resource?.PullRequestId ?? 0;
+            string? targetBranch = payload?.Resource?.TargetRefName;
 
             if (string.IsNullOrWhiteSpace(repoId) || prId <= 0)
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Invalid webhook payload. Repository id and pullRequestId are required.");
 
-            log.LogInformation("Webhook received for PR #{PrId} in repo {RepoId}. Initiating Azure AI Foundry Agent thread.", prId, repoId);
+            log.LogInformation("PR metadata parsed successfully -> PR ID: {PrId} | Repo GUID: {RepoId} | Target: {TargetBranch}", prId, repoId, targetBranch);
 
-            return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
+            try
             {
-                message = "Orchestration thread started.",
-                repoId,
-                prId
-            });
+                var agentsClient = new PersistentAgentsClient(ProjectEndpoint, new DefaultAzureCredential());
+
+                var threadResponse = await agentsClient.Threads.CreateThreadAsync();
+                string threadId = threadResponse.Value.Id;
+                log.LogInformation("Created active AI conversation session thread: {ThreadId}", threadId);
+
+                string userPrompt = $"Please execute a thorough code quality and security review for repositoryId: '{repoId}' and pullRequestId: {prId}. " +
+                                    "Autonomously invoke your connected OpenAPI tools to extract the git code diff changes, analyze the modified " +
+                                    "lines against your Angular 8 and .NET Framework 4.8 core guidelines, and publish your code critiques directly to the PR thread.";
+
+                await agentsClient.Messages.CreateMessageAsync(threadId, MessageRole.User, userPrompt);
+
+                log.LogInformation("Launching Agent run sequence using Blueprint ID: {BlueprintId}", AgentBlueprintId);
+                var runResponse = await agentsClient.Runs.CreateRunAsync(threadId, AgentBlueprintId);
+                string runId = runResponse.Value.Id;
+
+                var runStatus = runResponse.Value.Status;
+                while (runStatus == RunStatus.Queued || runStatus == RunStatus.InProgress)
+                {
+                    log.LogInformation("Agent is processing tools... Current execution state: {RunStatus}", runStatus);
+                    await Task.Delay(3000);
+
+                    var pollCheck = await agentsClient.Runs.GetRunAsync(threadId, runId);
+                    runStatus = pollCheck.Value.Status;
+                }
+
+                log.LogInformation("Agent completed execution lifecycle loop with final status code: {RunStatus}", runStatus);
+
+                if (runStatus == RunStatus.Failed)
+                {
+                    log.LogError("Agent run failed during processing execution.");
+                    return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Agent run failed.");
+                }
+
+                return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
+                {
+                    status = "Code review execution completed successfully.",
+                    activeThread = threadId,
+                    resultStatus = runStatus.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Critical error running the Agentic Review Orchestrator.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Failed to execute PR review agent.");
+            }
+
         }
     }
 
@@ -247,6 +302,9 @@ namespace AzDevOpsAgentBroker
 
         [JsonPropertyName("pullRequestId")]
         public int PullRequestId { get; set; }
+
+        [JsonPropertyName("targetRefName")]
+        public string? TargetRefName { get; set; }
     }
 
     public class PullRequestWebhookRepository
