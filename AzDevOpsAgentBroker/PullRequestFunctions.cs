@@ -1,15 +1,18 @@
+using AzDevOpsAgentBroker.Services;
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects;
+using Azure.Identity;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
+using OpenAI.Responses;
 using System;
 using System.IO;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Azure.AI.Agents.Persistent;
-using Azure.Identity;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
-using AzDevOpsAgentBroker.Services;
 
 namespace AzDevOpsAgentBroker
 {
@@ -140,10 +143,43 @@ namespace AzDevOpsAgentBroker
         }
     }
 
+    //public static class ListFoundryAgents
+    //{
+    //    [Function("ListFoundryAgents")]
+    //    public static async Task<HttpResponseData> Run(
+    //        [HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req,
+    //        FunctionContext context)
+    //    {
+    //        ILogger log = context.GetLogger("ListFoundryAgents");
+    //        string? endpoint = Environment.GetEnvironmentVariable("FoundryProjectEndpoint");
+    //        if (string.IsNullOrWhiteSpace(endpoint))
+    //            return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "FoundryProjectEndpoint not configured.");
+
+    //        log.LogInformation("Listing agents from Foundry endpoint: {Endpoint}", endpoint);
+
+    //        var credential = FoundryHelper.CreateCredential();
+    //        var projectClient = new AIProjectClient(new Uri(endpoint), credential);
+    //        var agents = new System.Collections.Generic.List<object>();
+
+    //        await foreach (var agent in projectClient.AgentAdministrationClient.GetAgentsAsync())
+    //        {
+    //            agents.Add(new { id = agent.Id, name = agent.Name ?? "(unnamed)" });
+    //            log.LogInformation("Found agent -> Id: {Id} | Name: {Name}", agent.Id, agent.Name);
+    //        }
+
+    //        return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
+    //        {
+    //            endpoint,
+    //            agentCount = agents.Count,
+    //            agents
+    //        });
+    //    }
+    //}
+
     public static class PRWebhookReceiver
     {
-        private static readonly string? ProjectEndpoint = Environment.GetEnvironmentVariable("FoundryProjectEndpoint");
-        private static readonly string? AgentBlueprintId = Environment.GetEnvironmentVariable("FoundryAgentId");
+        private static readonly string? ProjectEndpoint = FoundryHelper.GetEnvironmentValue("FoundryProjectEndpoint");
+        private static readonly string? AgentName = FoundryHelper.GetEnvironmentValue("FoundryAgentName");
 
         [Function("PRWebhookReceiver")]
         public static async Task<HttpResponseData> Run(
@@ -153,10 +189,10 @@ namespace AzDevOpsAgentBroker
             ILogger log = context.GetLogger("PRWebhookReceiver");
             log.LogInformation("Webhook received from Azure DevOps Pull Request trigger event.");
 
-            if (string.IsNullOrWhiteSpace(ProjectEndpoint) || string.IsNullOrWhiteSpace(AgentBlueprintId))
+            if (string.IsNullOrWhiteSpace(ProjectEndpoint) || string.IsNullOrWhiteSpace(AgentName))
             {
-                log.LogError("Missing Foundry configuration. Both FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_AGENT_ID are required.");
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing FOUNDRY_PROJECT_ENDPOINT or FOUNDRY_AGENT_ID configuration.");
+                log.LogError("Missing Foundry configuration. FoundryProjectEndpoint and FoundryAgentName are required.");
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Missing FoundryProjectEndpoint and/or FoundryAgentName configuration.");
             }
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
@@ -173,45 +209,31 @@ namespace AzDevOpsAgentBroker
 
             try
             {
-                var agentsClient = new PersistentAgentsClient(ProjectEndpoint, new DefaultAzureCredential());
+                var credential = FoundryHelper.CreateCredential();
 
-                var threadResponse = await agentsClient.Threads.CreateThreadAsync();
-                string threadId = threadResponse.Value.Id;
-                log.LogInformation("Created active AI conversation session thread: {ThreadId}", threadId);
+                // Verify the portal agent exists via the Projects SDK
+                var projectClient = new AIProjectClient(new Uri(ProjectEndpoint), credential);
 
+                ProjectConversation conversation = projectClient.ProjectOpenAIClient.GetProjectConversationsClient().CreateProjectConversation();
+
+                ProjectResponsesClient responsesClient = projectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgent(
+                   defaultAgent: AgentName,
+                   defaultConversationId: conversation.Id);
+
+                // Invoke the agent via the Foundry Responses API (not the legacy Assistants API)
                 string userPrompt = $"Please execute a thorough code quality and security review for repositoryId: '{repoId}' and pullRequestId: {prId}. " +
                                     "Autonomously invoke your connected OpenAPI tools to extract the git code diff changes, analyze the modified " +
                                     "lines against your Angular 8 and .NET Framework 4.8 core guidelines, and publish your code critiques directly to the PR thread.";
 
-                await agentsClient.Messages.CreateMessageAsync(threadId, MessageRole.User, userPrompt);
 
-                log.LogInformation("Launching Agent run sequence using Blueprint ID: {BlueprintId}", AgentBlueprintId);
-                var runResponse = await agentsClient.Runs.CreateRunAsync(threadId, AgentBlueprintId);
-                string runId = runResponse.Value.Id;
+                var response = responsesClient.CreateResponse(userPrompt);
 
-                var runStatus = runResponse.Value.Status;
-                while (runStatus == RunStatus.Queued || runStatus == RunStatus.InProgress)
-                {
-                    log.LogInformation("Agent is processing tools... Current execution state: {RunStatus}", runStatus);
-                    await Task.Delay(3000);
-
-                    var pollCheck = await agentsClient.Runs.GetRunAsync(threadId, runId);
-                    runStatus = pollCheck.Value.Status;
-                }
-
-                log.LogInformation("Agent completed execution lifecycle loop with final status code: {RunStatus}", runStatus);
-
-                if (runStatus == RunStatus.Failed)
-                {
-                    log.LogError("Agent run failed during processing execution.");
-                    return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Agent run failed.");
-                }
+                log.LogInformation("Agent completed successfully via Responses API. {@OutputText}", response.Value.GetOutputText());
 
                 return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
                 {
                     status = "Code review execution completed successfully.",
-                    activeThread = threadId,
-                    resultStatus = runStatus.ToString()
+                    agentName = AgentName
                 });
             }
             catch (Exception ex)
@@ -219,7 +241,31 @@ namespace AzDevOpsAgentBroker
                 log.LogError(ex, "Critical error running the Agentic Review Orchestrator.");
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Failed to execute PR review agent.");
             }
+        }
+    }
 
+    internal static class FoundryHelper
+    {
+        internal static Azure.Identity.DefaultAzureCredential CreateCredential()
+        {
+            string? tenantId = GetEnvironmentValue("AzureTenantId", "AZURE_TENANT_ID");
+            return new Azure.Identity.DefaultAzureCredential(new Azure.Identity.DefaultAzureCredentialOptions
+            {
+                TenantId = string.IsNullOrWhiteSpace(tenantId) ? null : tenantId,
+                ExcludeVisualStudioCredential = true,
+                ExcludeSharedTokenCacheCredential = true
+            });
+        }
+
+        internal static string? GetEnvironmentValue(params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var value = Environment.GetEnvironmentVariable(name);
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value;
+            }
+            return null;
         }
     }
 
