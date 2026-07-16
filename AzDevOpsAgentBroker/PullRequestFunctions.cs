@@ -1,12 +1,9 @@
 using AzDevOpsAgentBroker.Services;
 using Azure.AI.Extensions.OpenAI;
 using Azure.AI.Projects;
-using Azure.Identity;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic;
-using OpenAI.Responses;
 using System;
 using System.IO;
 using System.Net;
@@ -142,39 +139,6 @@ namespace AzDevOpsAgentBroker
             return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new { success = true, message = "Comment posted successfully." });
         }
     }
-
-    //public static class ListFoundryAgents
-    //{
-    //    [Function("ListFoundryAgents")]
-    //    public static async Task<HttpResponseData> Run(
-    //        [HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req,
-    //        FunctionContext context)
-    //    {
-    //        ILogger log = context.GetLogger("ListFoundryAgents");
-    //        string? endpoint = Environment.GetEnvironmentVariable("FoundryProjectEndpoint");
-    //        if (string.IsNullOrWhiteSpace(endpoint))
-    //            return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "FoundryProjectEndpoint not configured.");
-
-    //        log.LogInformation("Listing agents from Foundry endpoint: {Endpoint}", endpoint);
-
-    //        var credential = FoundryHelper.CreateCredential();
-    //        var projectClient = new AIProjectClient(new Uri(endpoint), credential);
-    //        var agents = new System.Collections.Generic.List<object>();
-
-    //        await foreach (var agent in projectClient.AgentAdministrationClient.GetAgentsAsync())
-    //        {
-    //            agents.Add(new { id = agent.Id, name = agent.Name ?? "(unnamed)" });
-    //            log.LogInformation("Found agent -> Id: {Id} | Name: {Name}", agent.Id, agent.Name);
-    //        }
-
-    //        return await FunctionResponses.CreateJsonResponse(req, HttpStatusCode.OK, new
-    //        {
-    //            endpoint,
-    //            agentCount = agents.Count,
-    //            agents
-    //        });
-    //    }
-    //}
 
     public static class PRWebhookReceiver
     {
