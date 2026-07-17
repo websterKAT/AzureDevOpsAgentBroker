@@ -1,0 +1,281 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Azure DevOps PR Review Broker",
+    "description": "Tools for reviewing Azure DevOps pull requests: retrieve PR diffs, details, file contents, and post review comments.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://azdevopsagentbroker.azurewebsites.net/api"
+    }
+  ],
+  "security": [
+    {
+      "functionKey": []
+    }
+  ],
+  "paths": {
+    "/GetPullRequestDiff": {
+      "post": {
+        "operationId": "getPullRequestDiff",
+        "summary": "Get the code diff/changes for a pull request",
+        "description": "Retrieves the file changes from the latest iteration of a pull request, including added, modified, and deleted files.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Function authorization key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pull request diff/changes JSON from Azure DevOps.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters."
+          }
+        }
+      }
+    },
+    "/GetPullRequestDetails": {
+      "post": {
+        "operationId": "getPullRequestDetails",
+        "summary": "Get pull request metadata and details",
+        "description": "Retrieves full details of a pull request including title, description, author, reviewers, status, and branch information.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Function authorization key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pull request details JSON from Azure DevOps.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters."
+          }
+        }
+      }
+    },
+    "/GetFileContent": {
+      "post": {
+        "operationId": "getFileContent",
+        "summary": "Get the content of a file at a specific commit",
+        "description": "Retrieves the full content of a file from the repository at a given commit SHA. Useful for reading source code referenced in a pull request diff.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Function authorization key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileContentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The raw file content.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters."
+          }
+        }
+      }
+    },
+    "/PostPRComment": {
+      "post": {
+        "operationId": "postPRComment",
+        "summary": "Post a review comment on a pull request",
+        "description": "Posts a comment thread on a pull request. Can be a general comment or an inline comment on a specific file and line number.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Function authorization key."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCommentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comment posted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input parameters."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "functionKey": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "code"
+      }
+    },
+    "schemas": {
+      "PullRequestInput": {
+        "type": "object",
+        "required": ["project", "repoId", "prId"],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "The Azure DevOps project name."
+          },
+          "repoId": {
+            "type": "string",
+            "description": "The repository ID (GUID) in Azure DevOps."
+          },
+          "prId": {
+            "type": "integer",
+            "description": "The pull request ID number."
+          }
+        }
+      },
+      "FileContentInput": {
+        "type": "object",
+        "required": ["project", "repoId", "filePath", "commitId"],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "The Azure DevOps project name."
+          },
+          "repoId": {
+            "type": "string",
+            "description": "The repository ID (GUID) in Azure DevOps."
+          },
+          "filePath": {
+            "type": "string",
+            "description": "The path to the file in the repository (e.g. /src/app/main.ts)."
+          },
+          "commitId": {
+            "type": "string",
+            "description": "The commit SHA to retrieve the file content at."
+          }
+        }
+      },
+      "PostCommentInput": {
+        "type": "object",
+        "required": ["project", "repoId", "prId", "comment"],
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "The Azure DevOps project name."
+          },
+          "repoId": {
+            "type": "string",
+            "description": "The repository ID (GUID) in Azure DevOps."
+          },
+          "prId": {
+            "type": "integer",
+            "description": "The pull request ID number."
+          },
+          "comment": {
+            "type": "string",
+            "description": "The review comment content (supports markdown)."
+          },
+          "path": {
+            "type": "string",
+            "description": "Optional. File path for an inline comment (e.g. /src/app/main.ts). Must be provided together with line."
+          },
+          "line": {
+            "type": "integer",
+            "description": "Optional. Line number for an inline comment. Must be provided together with path and must be greater than 0."
+          }
+        }
+      }
+    }
+  }
+}

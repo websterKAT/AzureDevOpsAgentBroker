@@ -151,7 +151,7 @@ namespace AzDevOpsAgentBroker
             FunctionContext context)
         {
             ILogger log = context.GetLogger("PRWebhookReceiver");
-            log.LogInformation("Webhook received from Azure DevOps Pull Request trigger event.");
+            log.LogInformation("Webhook received from Azure DevOps Pull Request trigger event");
 
             if (string.IsNullOrWhiteSpace(ProjectEndpoint) || string.IsNullOrWhiteSpace(AgentName))
             {
@@ -160,16 +160,19 @@ namespace AzDevOpsAgentBroker
             }
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+
+            log.LogInformation("Request: {@requestBody}", requestBody);
             var payload = JsonSerializer.Deserialize<PullRequestWebhookPayload>(requestBody);
 
             string? repoId = payload?.Resource?.Repository?.Id;
+            string? project = payload?.Resource?.Repository?.Project?.Name;
             int prId = payload?.Resource?.PullRequestId ?? 0;
             string? targetBranch = payload?.Resource?.TargetRefName;
 
-            if (string.IsNullOrWhiteSpace(repoId) || prId <= 0)
-                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Invalid webhook payload. Repository id and pullRequestId are required.");
+            if (string.IsNullOrWhiteSpace(repoId) || prId <= 0 || string.IsNullOrWhiteSpace(project))
+                return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.BadRequest, "Invalid webhook payload. Repository id, project, and pullRequestId are required.");
 
-            log.LogInformation("PR metadata parsed successfully -> PR ID: {PrId} | Repo GUID: {RepoId} | Target: {TargetBranch}", prId, repoId, targetBranch);
+            log.LogInformation("PR metadata parsed successfully -> PR ID: {PrId} | Repo GUID: {RepoId} | Project: {Project} | Target: {TargetBranch}", prId, repoId, project, targetBranch);
 
             try
             {
@@ -185,7 +188,7 @@ namespace AzDevOpsAgentBroker
                    defaultConversationId: conversation.Id);
 
                 // Invoke the agent via the Foundry Responses API (not the legacy Assistants API)
-                string userPrompt = $"Please execute a thorough code quality and security review for repositoryId: '{repoId}' and pullRequestId: {prId}. " +
+                string userPrompt = $"Please execute a thorough code quality and security review for project: '{project}', repositoryId: '{repoId}' and pullRequestId: {prId}. " +
                                     "Autonomously invoke your connected OpenAPI tools to extract the git code diff changes, analyze the modified " +
                                     "lines against your Angular 8 and .NET Framework 4.8 core guidelines, and publish your code critiques directly to the PR thread.";
 
@@ -321,6 +324,18 @@ namespace AzDevOpsAgentBroker
     {
         [JsonPropertyName("id")]
         public string? Id { get; set; }
+
+        [JsonPropertyName("project")]
+        public PullRequestWebhookProject? Project { get; set; }
+    }
+
+    public class PullRequestWebhookProject
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
     }
 }
 
