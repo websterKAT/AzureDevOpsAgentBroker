@@ -192,7 +192,7 @@ namespace AzDevOpsAgentBroker
                                     "Autonomously invoke your connected OpenAPI tools to extract the git code diff changes, analyze the modified " +
                                     "lines against your Angular 8 and .NET Framework 4.8 core guidelines, and publish your code critiques directly to the PR thread.";
 
-
+                log.LogInformation($"user Promt:{userPrompt}");
                 var response = responsesClient.CreateResponse(userPrompt);
 
                 log.LogInformation("Agent completed successfully via Responses API. {@OutputText}", response.Value.GetOutputText());
