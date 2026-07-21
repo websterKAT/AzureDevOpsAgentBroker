@@ -38,8 +38,8 @@ paths:
   /GetPullRequestDiff:
     post:
       operationId: get_pr_diff
-      summary: Extracts the git diff data changes for the pull request
-      description: Retrieves code delta changes, allowing the agent to audit line additions, updates, or removals across files.
+      summary: Extracts line-by-line code diffs for every file changed in the pull request
+      description: Fetches the PR iteration changes, retrieves both old and new blob content for each file, and computes a unified diff with +/- line markers. Returns a structured JSON object with pullRequestId and a filesChanged array containing path, changeType, and diff text. This gives the agent the full code delta in a single call.
       requestBody:
         required: true
         content:
@@ -62,7 +62,35 @@ paths:
                 - prId
       responses:
         '200':
-          description: Successfully returned Git diff content text.
+          description: Structured diff with line-by-line code changes for each file in the pull request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pullRequestId:
+                    type: integer
+                    description: The pull request ID.
+                  filesChanged:
+                    type: array
+                    description: List of changed files with their computed diffs.
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                          description: The file path in the repository.
+                        changeType:
+                          type: string
+                          description: 'The type of change: add, edit, delete, or rename.'
+                          enum:
+                            - add
+                            - edit
+                            - delete
+                            - rename
+                        diff:
+                          type: string
+                          description: Unified diff text with + (added) and - (removed) line markers showing the exact code changes.
   /GetFileContent:
     post:
       operationId: get_file_content

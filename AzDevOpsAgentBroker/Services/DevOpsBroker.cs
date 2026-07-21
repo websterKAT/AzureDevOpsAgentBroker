@@ -137,14 +137,43 @@ namespace AzDevOpsAgentBroker.Services
 
         private static string ComputeUnifiedDiff(string oldText, string newText)
         {
+            const int contextLines = 3;
             var diffBuilder = new InlineDiffBuilder(new Differ());
             var diff = diffBuilder.BuildDiffModel(oldText, newText);
+            var lines = diff.Lines;
+
+            // Identify which line indices have changes
+            var changeIndices = new HashSet<int>();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i].Type != ChangeType.Unchanged)
+                    changeIndices.Add(i);
+            }
+
+            // Include context lines around each change
+            var includeIndices = new HashSet<int>();
+            foreach (int idx in changeIndices)
+            {
+                for (int c = Math.Max(0, idx - contextLines); c <= Math.Min(lines.Count - 1, idx + contextLines); c++)
+                    includeIndices.Add(c);
+            }
 
             var sb = new StringBuilder();
-            int lineNum = 0;
-            foreach (var line in diff.Lines)
+            bool inHunk = false;
+            for (int i = 0; i < lines.Count; i++)
             {
-                lineNum++;
+                if (!includeIndices.Contains(i))
+                {
+                    if (inHunk)
+                    {
+                        sb.AppendLine("...");
+                        inHunk = false;
+                    }
+                    continue;
+                }
+
+                inHunk = true;
+                var line = lines[i];
                 switch (line.Type)
                 {
                     case ChangeType.Inserted:
@@ -158,7 +187,6 @@ namespace AzDevOpsAgentBroker.Services
                         sb.AppendLine($"+ {line.Text}");
                         break;
                     case ChangeType.Unchanged:
-                        // Include context lines around changes (skip large unchanged blocks)
                         sb.AppendLine($"  {line.Text}");
                         break;
                 }

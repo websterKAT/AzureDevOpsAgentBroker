@@ -210,7 +210,7 @@ namespace AzDevOpsAgentBroker
             }
             catch (Exception ex)
             {
-                log.LogError(ex, $"Critical error running the Agentic Review Orchestrator.{ex.Message}");
+                    log.LogError(ex, $"Critical error running the Agentic Review Orchestrator.{ex.Message}");
                 return await FunctionResponses.CreateTextResponse(req, HttpStatusCode.InternalServerError, "Failed to execute PR review agent.");
             }
         }

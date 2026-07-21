@@ -19,8 +19,8 @@
     "/GetPullRequestDiff": {
       "post": {
         "operationId": "getPullRequestDiff",
-        "summary": "Get the code diff/changes for a pull request",
-        "description": "Retrieves the file changes from the latest iteration of a pull request, including added, modified, and deleted files.",
+        "summary": "Get the line-by-line code diff for a pull request",
+        "description": "Retrieves the file changes from the latest iteration of a pull request. For each changed file, fetches the old and new blob content from Azure DevOps and computes a unified line-by-line diff (with +/- markers). Returns a structured JSON object with pullRequestId and a filesChanged array containing the path, changeType, and diff text for every modified file. This gives the agent the full code delta in a single call.",
         "parameters": [
           {
             "name": "code",
@@ -44,11 +44,39 @@
         },
         "responses": {
           "200": {
-            "description": "The pull request diff/changes JSON from Azure DevOps.",
+            "description": "Structured diff with line-by-line code changes for each file in the pull request.",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "properties": {
+                    "pullRequestId": {
+                      "type": "integer",
+                      "description": "The pull request ID."
+                    },
+                    "filesChanged": {
+                      "type": "array",
+                      "description": "List of changed files with their computed diffs.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "description": "The file path in the repository."
+                          },
+                          "changeType": {
+                            "type": "string",
+                            "description": "The type of change: add, edit, delete, or rename.",
+                            "enum": ["add", "edit", "delete", "rename"]
+                          },
+                          "diff": {
+                            "type": "string",
+                            "description": "Unified diff text with + (added) and - (removed) line markers showing the exact code changes."
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
