@@ -90,7 +90,7 @@ paths:
                             - rename
                         diff:
                           type: string
-                          description: Compact unified diff showing only modified lines with 3 lines of surrounding context. Uses + (added) and - (removed) prefixes. Non-adjacent hunks are separated by '...' markers. Does NOT include the full file content.
+                          description: "Compact unified diff with new-file line numbers. Format: 'L<lineNum>: + <text>' for added lines, '     - <text>' for removed lines, 'L<lineNum>:   <text>' for context. Only modified lines with 3 lines of surrounding context are shown. Non-adjacent hunks separated by '...' markers. Use the L<number> prefix to determine the correct line number when posting inline PR comments."
   /GetFileContent:
     post:
       operationId: get_file_content

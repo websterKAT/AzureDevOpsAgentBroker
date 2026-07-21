@@ -158,10 +158,42 @@ namespace AzDevOpsAgentBroker.Services
                     includeIndices.Add(c);
             }
 
+            // Track line numbers in both old and new files
+            int oldLineNum = 0;
+            int newLineNum = 0;
             var sb = new StringBuilder();
             bool inHunk = false;
             for (int i = 0; i < lines.Count; i++)
             {
+                var line = lines[i];
+
+                // Advance line counters regardless of inclusion
+                int currentOldLine = oldLineNum;
+                int currentNewLine = newLineNum;
+                switch (line.Type)
+                {
+                    case ChangeType.Inserted:
+                        newLineNum++;
+                        currentNewLine = newLineNum;
+                        break;
+                    case ChangeType.Deleted:
+                        oldLineNum++;
+                        currentOldLine = oldLineNum;
+                        break;
+                    case ChangeType.Modified:
+                        oldLineNum++;
+                        newLineNum++;
+                        currentOldLine = oldLineNum;
+                        currentNewLine = newLineNum;
+                        break;
+                    case ChangeType.Unchanged:
+                        oldLineNum++;
+                        newLineNum++;
+                        currentOldLine = oldLineNum;
+                        currentNewLine = newLineNum;
+                        break;
+                }
+
                 if (!includeIndices.Contains(i))
                 {
                     if (inHunk)
@@ -173,21 +205,20 @@ namespace AzDevOpsAgentBroker.Services
                 }
 
                 inHunk = true;
-                var line = lines[i];
                 switch (line.Type)
                 {
                     case ChangeType.Inserted:
-                        sb.AppendLine($"+ {line.Text}");
+                        sb.AppendLine($"L{currentNewLine}: + {line.Text}");
                         break;
                     case ChangeType.Deleted:
-                        sb.AppendLine($"- {line.Text}");
+                        sb.AppendLine($"     - {line.Text}");
                         break;
                     case ChangeType.Modified:
-                        sb.AppendLine($"- {line.Text}");
-                        sb.AppendLine($"+ {line.Text}");
+                        sb.AppendLine($"     - {line.Text}");
+                        sb.AppendLine($"L{currentNewLine}: + {line.Text}");
                         break;
                     case ChangeType.Unchanged:
-                        sb.AppendLine($"  {line.Text}");
+                        sb.AppendLine($"L{currentNewLine}:   {line.Text}");
                         break;
                 }
             }
@@ -197,9 +228,11 @@ namespace AzDevOpsAgentBroker.Services
         private static string FormatAsAddition(string content)
         {
             var sb = new StringBuilder();
+            int lineNum = 0;
             foreach (var line in content.Split('\n'))
             {
-                sb.AppendLine($"+ {line.TrimEnd('\r')}");
+                lineNum++;
+                sb.AppendLine($"L{lineNum}: + {line.TrimEnd('\r')}");
             }
             return sb.ToString();
         }
@@ -209,7 +242,7 @@ namespace AzDevOpsAgentBroker.Services
             var sb = new StringBuilder();
             foreach (var line in content.Split('\n'))
             {
-                sb.AppendLine($"- {line.TrimEnd('\r')}");
+                sb.AppendLine($"     - {line.TrimEnd('\r')}");
             }
             return sb.ToString();
         }
