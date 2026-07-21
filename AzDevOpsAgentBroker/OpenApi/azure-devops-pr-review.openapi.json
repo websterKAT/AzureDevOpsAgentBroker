@@ -71,7 +71,7 @@
                           },
                           "diff": {
                             "type": "string",
-                            "description": "Unified diff text with + (added) and - (removed) line markers showing the exact code changes."
+                            "description": "Compact unified diff showing only modified lines with 3 lines of surrounding context. Uses + (added) and - (removed) prefixes. Non-adjacent hunks are separated by '...' markers. Does NOT include the full file content."
                           }
                         }
                       }
