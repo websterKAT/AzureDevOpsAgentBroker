@@ -188,9 +188,14 @@ namespace AzDevOpsAgentBroker
                    defaultConversationId: conversation.Id);
 
                 // Invoke the agent via the Foundry Responses API (not the legacy Assistants API)
-                string userPrompt = $"Please execute a thorough code quality and security review for project: '{project}', repositoryId: '{repoId}' and pullRequestId: {prId}. " +
-                                    "Autonomously invoke your connected OpenAPI tools to extract the git code diff changes, analyze the modified " +
-                                    "lines against your Angular 8 and .NET Framework 4.8 core guidelines, and publish your code critiques directly to the PR thread.";
+                string userPrompt = $"Please execute a thorough code quality and security review for project: '{project}', repositoryId: '{repoId}' and pullRequestId: {prId}.\n\n" +
+                    "STRICT REVIEW CONSTRAINTS:\n" +
+                    "1. Autonomously invoke your connected OpenAPI tools to extract the git code diff changes.\n" +
+                    "2. CRITICAL SCOPE BOUNDARY: You MUST ONLY generate inline comments for lines that are NEWLY ADDED or MODIFIED (marked with '+' in the git diff).\n" +
+                    "3. DO NOT post comments on existing, unmodified lines, even if they contain anti-patterns or bugs.\n" +
+                    "4. If you use getFileContent for context, treat unmodified lines strictly as read-only references.\n" +
+                    "5. Analyze modified lines against Angular 8 and .NET Framework 4.8 guidelines and publish findings directly to the PR thread.";
+
 
                 log.LogInformation($"user Promt:{userPrompt}");
                 var response = responsesClient.CreateResponse(userPrompt);
